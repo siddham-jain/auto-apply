@@ -1,0 +1,691 @@
+{
+  "name": "Automated job applications & status tracking with LinkedIn, Indeed & Google Sheets",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "daily-trigger",
+      "name": "🕘 Daily Application Trigger",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        240,
+        560
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "configuration",
+      "name": "⚙️ Configuration",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        448,
+        560
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "documentId": "={{ $json.spreadsheetId }}",
+        "sheetName": "Jobs",
+        "options": {}
+      },
+      "id": "read-jobs",
+      "name": "📖 Read Jobs Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        672,
+        560
+      ],
+      "typeVersion": 4,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "xf7nPhKffjM1WV4p",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "not-applied",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Not Applied"
+            },
+            {
+              "id": "has-url",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              },
+              "leftValue": "={{ $json.Job_URL }}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "filter-pending",
+      "name": "🎯 Filter Pending Applications",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        896,
+        560
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "id": "split-jobs",
+      "name": "🔄 Process Jobs One by One",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        1120,
+        560
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "prepare-data",
+      "name": "📝 Prepare Application Data",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1328,
+        560
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "platform-router",
+      "name": "🔀 Route by Platform",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        1552,
+        560
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "url": "https://api.linkedin.com/v2/jobs/applications",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "linkedInOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "jobId",
+              "value": "={{ $json.Job_ID }}"
+            },
+            {
+              "name": "coverLetter",
+              "value": "={{ $json.personalizedCoverLetter }}"
+            },
+            {
+              "name": "resumeUrl",
+              "value": "={{ $json.resumeUrl }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "linkedin-apply",
+      "name": "💼 Apply via LinkedIn",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1776,
+        464
+      ],
+      "typeVersion": 4,
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "GU5Ge3ey0oWRRPgl",
+          "name": "LinkedIn OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.indeed.com/ads/applications",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "indeedApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "jobkey",
+              "value": "={{ $json.Job_ID }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.personalizedCoverLetter }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "indeed-apply",
+      "name": "🔍 Apply via Indeed",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1776,
+        672
+      ],
+      "typeVersion": 4
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "process-result",
+      "name": "📊 Process Application Result",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        2000,
+        560
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "documentId": "={{ $('Configuration').first().json.spreadsheetId }}",
+        "sheetName": "Jobs",
+        "options": {}
+      },
+      "id": "update-status",
+      "name": "📝 Update Job Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        2208,
+        560
+      ],
+      "typeVersion": 4,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "xf7nPhKffjM1WV4p",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendEmail"
+      },
+      "id": "send-notification",
+      "name": "📧 Send Application Notification",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        2432,
+        560
+      ],
+      "typeVersion": 2,
+      "webhookId": "338fc04a-71ac-41a3-8cd5-30e596bcd30d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "1UnhvirmmCTnHFz5",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "status-trigger",
+      "name": "🕐 Status Check Trigger",
+      "type": "n8n-nodes-base.cron",
+      "position": [
+        240,
+        1072
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "documentId": "={{ $('Configuration').first().json.spreadsheetId }}",
+        "sheetName": "Jobs",
+        "options": {}
+      },
+      "id": "read-applied",
+      "name": "📖 Read Applied Jobs",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        448,
+        1072
+      ],
+      "typeVersion": 4,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "xf7nPhKffjM1WV4p",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "applied-filter",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Applied"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "filter-applied",
+      "name": "🎯 Filter Applied Jobs",
+      "type": "n8n-nodes-base.filter",
+      "position": [
+        672,
+        1072
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "id": "split-status",
+      "name": "🔄 Check Status One by One",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [
+        896,
+        1072
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "mock-status-check",
+      "name": "🔍 Mock Status Check",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        1120,
+        1072
+      ],
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "status-changed",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "={{ $json.newStatus }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "status-changed",
+      "name": "🔄 Check if Status Changed",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1328,
+        1072
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "documentId": "={{ $('Configuration').first().json.spreadsheetId }}",
+        "sheetName": "Jobs",
+        "options": {}
+      },
+      "id": "update-changed",
+      "name": "📝 Update Changed Status",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [
+        1552,
+        1072
+      ],
+      "typeVersion": 4,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "xf7nPhKffjM1WV4p",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendEmail"
+      },
+      "id": "send-status-update",
+      "name": "📧 Send Status Update",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1776,
+        1072
+      ],
+      "typeVersion": 2,
+      "webhookId": "f373b36a-08f4-49dd-ac30-4e152d5c142a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "1UnhvirmmCTnHFz5",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "⚙️ Configuration": {
+      "main": [
+        [
+          {
+            "node": "📖 Read Jobs Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📖 Read Jobs Sheet": {
+      "main": [
+        [
+          {
+            "node": "🎯 Filter Pending Applications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Apply via Indeed": {
+      "main": [
+        [
+          {
+            "node": "📊 Process Application Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📖 Read Applied Jobs": {
+      "main": [
+        [
+          {
+            "node": "🎯 Filter Applied Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Update Job Status": {
+      "main": [
+        [
+          {
+            "node": "📧 Send Application Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔀 Route by Platform": {
+      "main": [
+        [
+          {
+            "node": "💼 Apply via LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔍 Apply via Indeed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Mock Status Check": {
+      "main": [
+        [
+          {
+            "node": "🔄 Check if Status Changed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💼 Apply via LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "📊 Process Application Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎯 Filter Applied Jobs": {
+      "main": [
+        [
+          {
+            "node": "🔄 Check Status One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🕐 Status Check Trigger": {
+      "main": [
+        [
+          {
+            "node": "📖 Read Applied Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Update Changed Status": {
+      "main": [
+        [
+          {
+            "node": "📧 Send Status Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔄 Check Status One by One": {
+      "main": [
+        [
+          {
+            "node": "🔍 Mock Status Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔄 Check if Status Changed": {
+      "main": [
+        [
+          {
+            "node": "📝 Update Changed Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔄 Process Jobs One by One": {
+      "main": [
+        [
+          {
+            "node": "📝 Prepare Application Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📝 Prepare Application Data": {
+      "main": [
+        [
+          {
+            "node": "🔀 Route by Platform",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🕘 Daily Application Trigger": {
+      "main": [
+        [
+          {
+            "node": "⚙️ Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📊 Process Application Result": {
+      "main": [
+        [
+          {
+            "node": "📝 Update Job Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎯 Filter Pending Applications": {
+      "main": [
+        [
+          {
+            "node": "🔄 Process Jobs One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c4b3b515-b30f-4adc-b477-079b75f47684",
+  "meta": {
+    "templateId": "5906",
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5fa74aa37246d1c7a7d508ced0ac457b3c37637071fbc628f8403f10b1d4e1e1"
+  },
+  "nodeGroups": [],
+  "id": "alCJIopByHpg2dqc",
+  "tags": []
+}
